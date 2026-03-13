@@ -394,7 +394,7 @@ if page == "🏠 Обзор":
                                        font_size=18, font_color=color, showarrow=False)],
                 )
                 with donut_cols[i]:
-                    st.plotly_chart(fig_d, use_container_width=True)
+                    st.plotly_chart(fig_d, use_container_width=True, key=f"donut_row1_{i}")
                     st.markdown(
                         f'<div style="text-align:center;margin-top:-10px;">'
                         f'<div style="font-size:12px;font-weight:bold;color:#333;">{short}</div>'
@@ -423,7 +423,7 @@ if page == "🏠 Обзор":
                                        font_size=18, font_color=color, showarrow=False)],
                 )
                 with donut_cols2[i]:
-                    st.plotly_chart(fig_d, use_container_width=True)
+                    st.plotly_chart(fig_d, use_container_width=True, key=f"donut_row2_{i}")
                     st.markdown(
                         f'<div style="text-align:center;margin-top:-10px;">'
                         f'<div style="font-size:12px;font-weight:bold;color:#333;">{short}</div>'
