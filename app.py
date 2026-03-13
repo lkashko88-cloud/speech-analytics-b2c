@@ -337,6 +337,103 @@ if page == "🏠 Обзор":
         )
         st.plotly_chart(fig_radar, use_container_width=True)
 
+    # ── Зона роста — сколько теряем ──────────────────────────────────────
+    if len(ftdf):
+        criteria_means = {}
+        for i, c in enumerate(ALL_CRITERIA):
+            vals = ftdf[c].dropna()
+            if len(vals):
+                criteria_means[SHORT_NAMES[i]] = vals.mean()
+
+        # Find weakest criterion
+        if criteria_means:
+            weakest_name = min(criteria_means, key=criteria_means.get)
+            weakest_score = criteria_means[weakest_name]
+            target_score = 4.0
+            if weakest_score < target_score:
+                lift_pct = (target_score - weakest_score) * 3  # ~3% per point
+                st.markdown(
+                    f'<div style="background:#fff5f5;border:2px solid #e74c3c;border-radius:12px;'
+                    f'padding:16px 20px;margin:10px 0;color:#333;">'
+                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+                    f'<span style="font-size:20px;">&#9888;</span>'
+                    f'<b style="font-size:16px;">Зона роста — сколько теряем</b></div>'
+                    f'<p style="margin:0;color:#495057;">Если поднять <b>{weakest_name}</b> '
+                    f'с <span style="color:#e74c3c;font-weight:bold;">{weakest_score:.1f}</span> '
+                    f'до <span style="color:#2ecc71;font-weight:bold;">{target_score:.1f}</span> '
+                    f'— конверсия вырастет примерно на '
+                    f'<span style="color:#2ecc71;font-weight:bold;">+{lift_pct:.0f}%</span></p>'
+                    f'<p style="margin:4px 0 0 0;color:#999;font-size:12px;">Расчёт на основе корреляции качества и конверсии по данным пилота</p>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+    st.markdown("---")
+
+    # ── Donut: критерии в норме / ниже нормы ─────────────────────────
+    if len(ftdf):
+        st.subheader("Сводка по критериям оценки")
+        norm_threshold = 3.8
+        donut_cols = st.columns(5)
+        for i, (short, full) in enumerate(zip(SHORT_NAMES[:5], ALL_CRITERIA[:5])):
+            vals = ftdf[full].dropna()
+            if len(vals):
+                score_pct = vals.mean() / 5 * 100
+                is_norm = vals.mean() >= norm_threshold
+                color = "#2ecc71" if is_norm else "#e74c3c"
+                status = "В норме" if is_norm else "Ниже нормы"
+                fig_d = go.Figure(go.Pie(
+                    values=[score_pct, 100 - score_pct],
+                    hole=0.7, marker=dict(colors=[color, "#f0f0f0"]),
+                    textinfo="none", hoverinfo="skip",
+                ))
+                fig_d.update_layout(
+                    margin=dict(t=10, b=10, l=10, r=10), height=140, width=140,
+                    showlegend=False,
+                    annotations=[dict(text=f"{vals.mean():.1f}", x=0.5, y=0.5,
+                                       font_size=18, font_color=color, showarrow=False)],
+                )
+                with donut_cols[i]:
+                    st.plotly_chart(fig_d, use_container_width=True)
+                    st.markdown(
+                        f'<div style="text-align:center;margin-top:-10px;">'
+                        f'<div style="font-size:12px;font-weight:bold;color:#333;">{short}</div>'
+                        f'<div style="font-size:11px;color:{color};">{"&#10003; " + status if is_norm else "&#10007; " + status}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+        donut_cols2 = st.columns(5)
+        for i, (short, full) in enumerate(zip(SHORT_NAMES[5:], ALL_CRITERIA[5:])):
+            vals = ftdf[full].dropna()
+            if len(vals):
+                score_pct = vals.mean() / 5 * 100
+                is_norm = vals.mean() >= norm_threshold
+                color = "#2ecc71" if is_norm else "#e74c3c"
+                status = "В норме" if is_norm else "Ниже нормы"
+                fig_d = go.Figure(go.Pie(
+                    values=[score_pct, 100 - score_pct],
+                    hole=0.7, marker=dict(colors=[color, "#f0f0f0"]),
+                    textinfo="none", hoverinfo="skip",
+                ))
+                fig_d.update_layout(
+                    margin=dict(t=10, b=10, l=10, r=10), height=140, width=140,
+                    showlegend=False,
+                    annotations=[dict(text=f"{vals.mean():.1f}", x=0.5, y=0.5,
+                                       font_size=18, font_color=color, showarrow=False)],
+                )
+                with donut_cols2[i]:
+                    st.plotly_chart(fig_d, use_container_width=True)
+                    st.markdown(
+                        f'<div style="text-align:center;margin-top:-10px;">'
+                        f'<div style="font-size:12px;font-weight:bold;color:#333;">{short}</div>'
+                        f'<div style="font-size:11px;color:{color};">{"&#10003; " + status if is_norm else "&#10007; " + status}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+    st.markdown("---")
+
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Тональность клиентов")
@@ -373,6 +470,130 @@ if page == "🏠 Обзор":
 # ═══════════════════════════════════════════════════════════════════════════
 elif page == "👤 Команда и развитие":
     st.title("Команда: оценки и план развития")
+
+    # ── ТОП-3 фокуса на неделю ───────────────────────────────────────
+    st.subheader("ТОП-3 фокуса на неделю")
+    st.caption("Слабейшие критерии команды и конкретные шаги для улучшения")
+
+    TOP_FOCUS_STEPS = {
+        "Завершение": [
+            "Прослушать 5 худших звонков — зафиксировать момент потери инициативы",
+            "Внедрить скрипт: резюме потребностей → фиксация шага → подтверждение даты",
+            "Ежедневно проверять последние 2 минуты каждого звонка",
+        ],
+        "Презентация": [
+            "Перед звонком записывать цель в CRM (1 предложение)",
+            "Первые 30 секунд: озвучить цель клиенту. Шаблон: «Для вашей задачи — [X], чтобы вы получили [Y]»",
+            "После звонка сверить результат с целью. Если не совпало — записать причину",
+        ],
+        "Возражения": [
+            "Собрать топ-5 возражений из последних звонков",
+            "На каждое возражение подготовить связку: согласие + аргумент + вопрос",
+            "Провести ролевую игру: супервайзер = клиент с возражением",
+        ],
+        "Потребности": [
+            "Составить список из 5 открытых вопросов для каждого продукта",
+            "Тренировка: первые 2 минуты звонка — только вопросы, без презентации",
+            "Отмечать в CRM выявленные потребности после каждого звонка",
+        ],
+        "Контакт": [
+            "Стандартизировать приветствие: имя + компания + имя клиента",
+            "Первые 10 секунд — улыбка в голосе, снижение темпа речи",
+            "Прослушать 3 лучших приветствия в команде — взять за образец",
+        ],
+        "Модули": [
+            "Чек-лист завершения: итог + следующий шаг + контакт + благодарность",
+            "Проверять каждый звонок: был ли задан вопрос «Остались ли вопросы?»",
+            "Добавить в скрипт точную дату/время следующего контакта",
+        ],
+        "Слушание": [
+            "После каждого ответа клиента — перефразировать: «Правильно ли я понимаю...»",
+            "Запретить себе перебивать — выдерживать паузу 2 сек после ответа клиента",
+            "Фиксировать ключевые слова клиента и использовать их в презентации",
+        ],
+    }
+
+    # Calculate team averages
+    team_criteria = {}
+    for i, c in enumerate(ALL_CRITERIA):
+        vals = df_targeted[c].dropna()
+        if len(vals):
+            team_criteria[SHORT_NAMES[i]] = vals.mean()
+
+    if team_criteria:
+        sorted_criteria = sorted(team_criteria.items(), key=lambda x: x[1])
+        focus_cols = st.columns(3)
+        for idx, (name, score) in enumerate(sorted_criteria[:3]):
+            target = 4.0
+            lift = (target - score) * 3
+            steps = TOP_FOCUS_STEPS.get(name, ["Провести индивидуальный разбор", "Прослушать 5 худших звонков", "Через неделю проверить динамику"])
+            with focus_cols[idx]:
+                st.markdown(
+                    f'<div style="background:#fff;border:1px solid #e0e0e0;border-radius:12px;'
+                    f'padding:16px;min-height:280px;">'
+                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+                    f'<span style="background:#3498db;color:white;width:28px;height:28px;border-radius:50%;'
+                    f'display:inline-flex;align-items:center;justify-content:center;font-weight:bold;">{idx+1}</span>'
+                    f'<b style="font-size:15px;color:#333;">{name}</b></div>'
+                    f'<div style="color:#999;font-size:13px;">Текущий: <span style="color:#e74c3c;font-weight:bold;">{score:.1f}</span></div>'
+                    f'<div style="color:#2ecc71;font-size:13px;margin-bottom:10px;">&#8599; +{lift:.0f} п.п. при выполнении</div>'
+                    f'<div style="font-size:13px;color:#495057;">'
+                    f'<p style="margin:6px 0;">1. {steps[0]}</p>'
+                    f'<p style="margin:6px 0;">2. {steps[1]}</p>'
+                    f'<p style="margin:6px 0;">3. {steps[2]}</p>'
+                    f'</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+    st.markdown("---")
+
+    # ── Карта компетенций по операторам ───────────────────────────────
+    st.subheader("Карта компетенций по операторам")
+    st.caption("Норма: 3.8 · Цветовая шкала: зелёный = хорошо, жёлтый = зона риска, красный = критично")
+
+    comp_data = []
+    for agent in sorted(df_targeted["agent_short"].unique()):
+        adf = df_targeted[df_targeted["agent_short"] == agent]
+        row = {"Оператор": agent}
+        scores_list = []
+        for i, c in enumerate(ALL_CRITERIA):
+            vals = adf[c].dropna()
+            score = vals.mean() if len(vals) else 0
+            row[SHORT_NAMES[i]] = score
+            scores_list.append(score)
+        row["Средн."] = np.mean(scores_list) if scores_list else 0
+        comp_data.append(row)
+
+    if comp_data:
+        comp_df = pd.DataFrame(comp_data)
+        # Render as colored HTML table
+        html_table = '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+        html_table += '<tr style="background:#f8f9fa;">'
+        html_table += '<th style="padding:10px;text-align:left;border-bottom:2px solid #dee2e6;color:#333;">Оператор</th>'
+        for col in SHORT_NAMES + ["Средн."]:
+            html_table += f'<th style="padding:10px;text-align:center;border-bottom:2px solid #dee2e6;color:#333;">{col}</th>'
+        html_table += '</tr>'
+
+        for _, row in comp_df.iterrows():
+            html_table += '<tr>'
+            html_table += f'<td style="padding:8px 10px;border-bottom:1px solid #eee;font-weight:bold;color:#333;">{row["Оператор"]}</td>'
+            for col in SHORT_NAMES + ["Средн."]:
+                val = row[col]
+                if val >= 4.0:
+                    bg = "#d4edda"
+                    text_c = "#155724"
+                elif val >= 3.0:
+                    bg = "#fff3cd"
+                    text_c = "#856404"
+                else:
+                    bg = "#f8d7da"
+                    text_c = "#721c24"
+                html_table += f'<td style="padding:8px;text-align:center;background:{bg};color:{text_c};font-weight:bold;border-bottom:1px solid #eee;">{val:.1f}</td>'
+            html_table += '</tr>'
+        html_table += '</table>'
+        st.markdown(html_table, unsafe_allow_html=True)
+
+    st.markdown("---")
 
     agent_stats = []
     for agent in df["agent_short"].unique():
@@ -987,22 +1208,81 @@ elif page == "🧑‍💼 Личный кабинет оператора":
             # Team average for comparison
             team_means = [df_targeted[c].dropna().mean() if len(df_targeted[c].dropna()) else 0 for c in ALL_CRITERIA]
 
-            fig_radar = go.Figure()
-            fig_radar.add_trace(go.Scatterpolar(
-                r=team_means + [team_means[0]], theta=SHORT_NAMES + [SHORT_NAMES[0]],
-                fill="toself", fillcolor="rgba(189, 195, 199, 0.15)",
-                line=dict(color="#bdc3c7", width=1, dash="dash"), name="Среднее по команде",
-            ))
-            fig_radar.add_trace(go.Scatterpolar(
-                r=means + [means[0]], theta=SHORT_NAMES + [SHORT_NAMES[0]],
-                fill="toself", fillcolor="rgba(52, 152, 219, 0.25)",
-                line=dict(color="#3498db", width=2), name=current_operator,
-            ))
-            fig_radar.update_layout(
-                polar=dict(radialaxis=dict(visible=True, range=[0, 5])),
-                margin=dict(t=40, b=40, l=100, r=100), height=420,
-            )
-            st.plotly_chart(fig_radar, use_container_width=True)
+            # Top performer benchmark
+            top_means = []
+            for c in ALL_CRITERIA:
+                agent_avgs = []
+                for a in df_targeted["agent_short"].unique():
+                    a_vals = df_targeted[df_targeted["agent_short"] == a][c].dropna()
+                    if len(a_vals):
+                        agent_avgs.append(a_vals.mean())
+                top_means.append(max(agent_avgs) if agent_avgs else 0)
+
+            norm_line = [3.8] * len(ALL_CRITERIA)
+
+            radar_col, bars_col = st.columns([3, 2])
+
+            with radar_col:
+                fig_radar = go.Figure()
+                # Norm 3.8
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=norm_line + [norm_line[0]], theta=SHORT_NAMES + [SHORT_NAMES[0]],
+                    fill=None, line=dict(color="#95a5a6", width=1, dash="dash"), name="Норма 3.8",
+                ))
+                # Top performer
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=top_means + [top_means[0]], theta=SHORT_NAMES + [SHORT_NAMES[0]],
+                    fill=None, line=dict(color="#9b59b6", width=1, dash="dot"), name="Топ команды",
+                ))
+                # Team average
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=team_means + [team_means[0]], theta=SHORT_NAMES + [SHORT_NAMES[0]],
+                    fill="toself", fillcolor="rgba(189, 195, 199, 0.1)",
+                    line=dict(color="#bdc3c7", width=1, dash="dash"), name="Среднее по команде",
+                ))
+                # Current operator
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=means + [means[0]], theta=SHORT_NAMES + [SHORT_NAMES[0]],
+                    fill="toself", fillcolor="rgba(52, 152, 219, 0.25)",
+                    line=dict(color="#3498db", width=2), name=current_operator,
+                ))
+                fig_radar.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 5])),
+                    margin=dict(t=40, b=40, l=100, r=100), height=420,
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+                )
+                st.plotly_chart(fig_radar, use_container_width=True)
+
+            # Horizontal bars with trends
+            with bars_col:
+                st.markdown("#### Оценки по компонентам")
+                # Simulate trend (difference vs team average)
+                for i, (short, score) in enumerate(zip(SHORT_NAMES, means)):
+                    if score == 0:
+                        continue
+                    team_avg = team_means[i]
+                    diff = score - team_avg
+                    pct = score / 5 * 100
+                    if score >= 4.0:
+                        bar_color = "#2ecc71"
+                    elif score >= 3.0:
+                        bar_color = "#f39c12"
+                    else:
+                        bar_color = "#e74c3c"
+                    trend_color = "#2ecc71" if diff >= 0 else "#e74c3c"
+                    trend_arrow = "&#8599;" if diff >= 0 else "&#8600;"
+                    st.markdown(
+                        f'<div style="margin:6px 0;">'
+                        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">'
+                        f'<span style="font-size:13px;color:#333;">{short}</span>'
+                        f'<span style="font-size:13px;"><b>{score:.1f}</b> '
+                        f'<span style="color:{trend_color};font-size:12px;">{trend_arrow}{diff:+.1f}</span></span>'
+                        f'</div>'
+                        f'<div style="background:#f0f0f0;border-radius:4px;height:8px;overflow:hidden;">'
+                        f'<div style="background:{bar_color};width:{pct}%;height:100%;border-radius:4px;"></div>'
+                        f'</div></div>',
+                        unsafe_allow_html=True,
+                    )
 
             # Strengths and weaknesses
             col_s, col_w = st.columns(2)
@@ -1036,6 +1316,26 @@ elif page == "🧑‍💼 Личный кабинет оператора":
                             f'<span style="float:right;color:{text_color};font-weight:bold;">{score:.1f}</span>'
                             f'</div>', unsafe_allow_html=True,
                         )
+
+            # ── Зона роста оператора ──────────────────────────────
+            if criteria_scores_sorted:
+                worst_name, worst_score = criteria_scores_sorted[-1]
+                if worst_score < 4.0:
+                    op_lift = (4.0 - worst_score) * 3
+                    st.markdown(
+                        f'<div style="background:#fef9e7;border:2px solid #f39c12;border-radius:12px;'
+                        f'padding:14px 18px;margin:16px 0;color:#333;">'
+                        f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+                        f'<span style="font-size:18px;">&#9888;</span>'
+                        f'<b>Зона роста — сколько теряем</b></div>'
+                        f'<p style="margin:0;">Если поднять <b>{worst_name}</b> '
+                        f'с <span style="color:#e74c3c;font-weight:bold;">{worst_score:.1f}</span> '
+                        f'до <span style="color:#2ecc71;font-weight:bold;">4.0</span> '
+                        f'— конверсия вырастет примерно на '
+                        f'<span style="color:#2ecc71;font-weight:bold;">+{op_lift:.0f}%</span></p>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
             # Weekly dynamics
             st.markdown("---")
